@@ -1,0 +1,9 @@
+[package]
+name = "liamt-raytracer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nannou = { version = "0.19", features = ["spirv"] }
+spirv-builder = { git = "https://github.com/rust-gpu/rust-gpu" }
+shared = { path = "../shared" }
