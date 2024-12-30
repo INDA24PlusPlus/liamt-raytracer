@@ -32,7 +32,7 @@ impl RNG {
 
     pub fn rand_f(&mut self) -> f32 {
         let word = self.rand_u();
-        f32::from_bits(((word >> 22) ^ word) | 0x2f800004)
+        f32::from_bits((word >> 9) | 0x3f800000) - 1.0
     }
 }
 
@@ -181,10 +181,11 @@ pub struct Camera {
     pub first: Vec3,
     pub pdu: Vec3,
     pub pdv: Vec3,
+    pub samples: u32,
 }
 
 impl Camera {
-    pub fn new(width: f32, height: f32, focal_len: f32, vph: f32) -> Self {
+    pub fn new(width: f32, height: f32, focal_len: f32, vph: f32, samples: u32) -> Self {
         let center = vec3(0.0, 0.0, 0.0);
 
         let aspect_ratio = width / height;
@@ -208,6 +209,7 @@ impl Camera {
             first,
             pdu,
             pdv,
+            samples,
         }
     }
 }
