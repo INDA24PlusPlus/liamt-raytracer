@@ -18,6 +18,8 @@ pub fn main_fs(
         100,
     );
 
+    let max_depth = 3;
+
     let mut rng = RNG::new(constants, in_coord);
 
     let world = [
@@ -39,7 +41,7 @@ pub fn main_fs(
         },
     ];
 
-    let mut color = vec4(0.0, 0.0, 0.0, 1.0);
+    let mut color = vec3(0.0, 0.0, 0.0);
 
     for _ in 0..camera.samples {
         let offset_square = vec3(rng.rand_f() - 0.5, rng.rand_f() - 0.5, 0.0);
@@ -49,10 +51,12 @@ pub fn main_fs(
         let ray_direction = pixel_center - camera.center;
         let ray = Ray::new(camera.center, ray_direction);
 
-        color += ray_color(&ray, world);
+        color += ray_color(ray, world, &mut rng, max_depth);
     }
 
-    *output = color / camera.samples as f32;
+    color /= camera.samples as f32;
+
+    *output = vec4(color.x, color.y, color.z, 1.0);
 }
 
 #[spirv(vertex)]

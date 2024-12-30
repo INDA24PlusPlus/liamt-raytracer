@@ -2,6 +2,7 @@
 
 use spirv_std::glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use spirv_std::num_traits::Float;
+use spirv_std::num_traits::FloatConst;
 use spirv_std::vector::Vector;
 
 pub struct ShaderConsts {
@@ -15,11 +16,8 @@ pub struct RNG {
 
 impl RNG {
     pub fn new(consts: &ShaderConsts, coords: Vec4) -> Self {
-        // idk what im doing here
-        let mut state = consts.resolution[0].wrapping_mul(coords.x as u32);
-        state ^= consts.resolution[1].wrapping_mul(coords.y as u32);
+        let mut state = coords.x.to_bits() + coords.y.to_bits() * consts.resolution[0];
         state ^= consts.time.to_bits();
-
         Self { state }
     }
 
@@ -33,6 +31,38 @@ impl RNG {
     pub fn rand_f(&mut self) -> f32 {
         let word = self.rand_u();
         f32::from_bits((word >> 9) | 0x3f800000) - 1.0
+    }
+
+    pub fn rand_f_range(&mut self, min: f32, max: f32) -> f32 {
+        min + self.rand_f() * (max - min)
+    }
+
+    pub fn rand_vec3(&mut self) -> Vec3 {
+        vec3(self.rand_f(), self.rand_f(), self.rand_f())
+    }
+
+    pub fn rand_vec3_range(&mut self, min: f32, max: f32) -> Vec3 {
+        vec3(
+            self.rand_f_range(min, max),
+            self.rand_f_range(min, max),
+            self.rand_f_range(min, max),
+        )
+    }
+
+    pub fn rand_unit_vec3(&mut self) -> Vec3 {
+        let a = self.rand_f_range(0.0, 2.0 * f32::PI());
+        let z = self.rand_f_range(-1.0, 1.0);
+        let r = (1.0 - z * z).sqrt();
+        vec3(r * a.cos(), r * a.sin(), z)
+    }
+
+    pub fn rand_hemisphere_vec3(&mut self, normal: Vec3) -> Vec3 {
+        let on = self.rand_unit_vec3();
+        if on.dot(normal) > 0.0 {
+            on
+        } else {
+            -on
+        }
     }
 }
 
@@ -150,27 +180,29 @@ impl<T: Copy + Hittable, const N: usize> Hittable for [T; N] {
     }
 }
 
-pub fn ray_color(ray: &Ray, world: impl Copy + Hittable) -> Vec4 {
-    let mut hit_data = HitData::new();
+pub fn ray_color(mut ray: Ray, world: impl Copy + Hittable, rng: &mut RNG, max_depth: u32) -> Vec3 {
+    let mut color = vec3(1.0, 1.0, 1.0);
 
-    if world.hit(ray, 0.0, f32::INFINITY, &mut hit_data) {
-        // Nice rainbow colors
-        return vec4(
-            0.5 * (hit_data.normal.x + 1.0),
-            0.5 * (hit_data.normal.y + 1.0),
-            0.5 * (hit_data.normal.z + 1.0),
-            1.0,
-        );
+    for _ in 0..max_depth {
+        let mut hit_data = HitData::new();
+
+        if world.hit(&ray, 0.0001, f32::INFINITY, &mut hit_data) {
+            let dir = rng.rand_hemisphere_vec3(hit_data.normal);
+            ray = Ray::new(hit_data.point, dir);
+            color *= 0.5;
+        } else {
+            let res = 0.5 * (ray.direction.normalize().y + 1.0);
+            return color
+                * vec3(
+                    (1.0 - res) * 1.0 + res * 0.5,
+                    (1.0 - res) * 1.0 + res * 0.7,
+                    (1.0 - res) * 1.0 + res * 1.0,
+                );
+        }
     }
 
-    // Nice sky gradient color
-    let res = 0.5 * (ray.direction.normalize().y + 1.0);
-    vec4(
-        (1.0 - res) * 1.0 + res * 0.5,
-        (1.0 - res) * 1.0 + res * 0.7,
-        (1.0 - res) * 1.0 + res * 1.0,
-        1.0,
-    )
+    // If max depth reached
+    vec3(0.0, 0.0, 0.0)
 }
 
 pub struct Camera {
