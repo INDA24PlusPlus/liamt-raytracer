@@ -90,6 +90,7 @@ pub struct HitData {
     pub normal: Vec3,
     pub t: f32,
     pub front: bool,
+    pub material: Material,
 }
 
 impl HitData {
@@ -99,6 +100,7 @@ impl HitData {
             normal: vec3(0.0, 0.0, 0.0),
             t: 0.0,
             front: false,
+            material: Material::new(vec3(0.0, 0.0, 0.0), 0.0),
         }
     }
 
@@ -117,11 +119,16 @@ pub trait Hittable {
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
+    pub material: Material,
 }
 
 impl Sphere {
     pub fn new(center: Vec3, radius: f32) -> Self {
-        Self { center, radius }
+        Self {
+            center,
+            radius,
+            material: Material::new(vec3(0.0, 0.0, 0.0), 0.0),
+        }
     }
 }
 
@@ -155,6 +162,7 @@ impl Hittable for Sphere {
         hit_data.normal = (hit_data.point - self.center) / self.radius;
         let out_normal = (hit_data.point - self.center) / self.radius;
         hit_data.set_normal(ray, out_normal);
+        hit_data.material = self.material;
 
         true
     }
@@ -187,15 +195,15 @@ pub fn ray_color(mut ray: Ray, world: impl Copy + Hittable, rng: &mut RNG, max_d
         let mut hit_data = HitData::new();
 
         if world.hit(&ray, 0.0001, f32::INFINITY, &mut hit_data) {
-            let dir = rng.rand_hemisphere_vec3(hit_data.normal);
-            ray = Ray::new(hit_data.point, dir);
-            color *= 0.5;
+            let (r, col) = hit_data.material.scatter(&ray, &hit_data, rng);
+            ray = r;
+            color *= col;
         } else {
             let res = 0.5 * (ray.direction.normalize().y + 1.0);
             return color
                 * vec3(
+                    (1.0 - res) * 1.0 + res * 0.3,
                     (1.0 - res) * 1.0 + res * 0.5,
-                    (1.0 - res) * 1.0 + res * 0.7,
                     (1.0 - res) * 1.0 + res * 1.0,
                 );
         }
@@ -203,6 +211,14 @@ pub fn ray_color(mut ray: Ray, world: impl Copy + Hittable, rng: &mut RNG, max_d
 
     // If max depth reached
     vec3(0.0, 0.0, 0.0)
+}
+
+pub fn convert_color(color: f32) -> f32 {
+    if color > 0.0 {
+        color.sqrt()
+    } else {
+        0.0
+    }
 }
 
 pub struct Camera {
@@ -223,9 +239,11 @@ impl Camera {
         let aspect_ratio = width / height;
         let vpw = vph * aspect_ratio;
 
+        // Viewport vectors
         let vpu = vec3(vpw, 0.0, 0.0);
         let vpv = vec3(0.0, -vph, 0.0);
 
+        // Pixel delta vectors
         let pdu = vpu / width;
         let pdv = vpv / height;
 
@@ -243,5 +261,29 @@ impl Camera {
             pdv,
             samples,
         }
+    }
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct Material {
+    pub color: Vec3,
+    pub shininess: f32,
+}
+
+impl Material {
+    pub fn new(color: Vec3, shininess: f32) -> Self {
+        Self { color, shininess }
+    }
+    pub fn scatter(&self, ray: &Ray, hit_data: &HitData, rng: &mut RNG) -> (Ray, Vec3) {
+        let scatter_dir = if rng.rand_f() < self.shininess {
+            ray.direction.reflect(hit_data.normal)
+        } else {
+            hit_data.normal + rng.rand_unit_vec3()
+        };
+
+        let ray = Ray::new(hit_data.point, scatter_dir);
+        let att = self.color;
+        (ray, att)
     }
 }

@@ -18,26 +18,52 @@ pub fn main_fs(
         100,
     );
 
-    let max_depth = 3;
+    let max_depth = 5;
 
     let mut rng = RNG::new(constants, in_coord);
+
+    let redmat = Material {
+        color: vec3(1.0, 0.0, 0.0),
+        shininess: 0.0,
+    };
+    let greenmat = Material {
+        color: vec3(0.0, 1.0, 0.0),
+        shininess: 0.0,
+    };
+    let bluemat = Material {
+        color: vec3(0.0, 0.0, 1.0),
+        shininess: 0.0,
+    };
+    let shinymat = Material {
+        color: vec3(1.0, 1.0, 1.0),
+        shininess: 1.0,
+    };
 
     let world = [
         Sphere {
             center: vec3(0.0, 0.0, -1.0),
             radius: 0.5,
+            material: shinymat,
+        },
+        Sphere {
+            center: vec3(1.3, 0.0, -1.0),
+            radius: 0.5,
+            material: greenmat,
         },
         Sphere {
             center: vec3(-2.0, 1.0, -2.0),
             radius: 0.3,
+            material: greenmat,
         },
         Sphere {
             center: vec3(2.5, 0.5, -3.5),
             radius: 0.2,
+            material: bluemat,
         },
         Sphere {
             center: vec3(0.0, -100.5, -1.0),
             radius: 100.0,
+            material: redmat,
         },
     ];
 
