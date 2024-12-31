@@ -230,13 +230,18 @@ pub struct Camera {
     pub pdu: Vec3,
     pub pdv: Vec3,
     pub samples: u32,
+    pub fov: f32,
 }
 
 impl Camera {
-    pub fn new(width: f32, height: f32, focal_len: f32, vph: f32, samples: u32) -> Self {
+    pub fn new(width: f32, height: f32, focal_len: f32, samples: u32, fov: f32) -> Self {
         let center = vec3(0.0, 0.0, 0.0);
 
         let aspect_ratio = width / height;
+
+        let t = fov * f32::PI() / 180.0;
+        let h = (t / 2.0).tan();
+        let vph = 2.0 * h * focal_len;
         let vpw = vph * aspect_ratio;
 
         // Viewport vectors
@@ -260,6 +265,7 @@ impl Camera {
             pdu,
             pdv,
             samples,
+            fov,
         }
     }
 }

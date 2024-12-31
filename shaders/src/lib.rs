@@ -14,8 +14,8 @@ pub fn main_fs(
         constants.resolution[0] as f32,
         constants.resolution[1] as f32,
         1.0,
-        2.0,
         100,
+        90.0,
     );
 
     let max_depth = 5;
