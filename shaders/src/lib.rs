@@ -13,9 +13,11 @@ pub fn main_fs(
     let camera = Camera::new(
         constants.resolution[0] as f32,
         constants.resolution[1] as f32,
-        1.0,
         100,
         90.0,
+        vec3(-2.0, 2.0, 1.0),
+        vec3(0.0, 0.0, -1.0),
+        vec3(0.0, 1.0, 0.0),
     );
 
     let max_depth = 5;

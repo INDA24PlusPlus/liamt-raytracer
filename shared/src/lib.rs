@@ -231,11 +231,26 @@ pub struct Camera {
     pub pdv: Vec3,
     pub samples: u32,
     pub fov: f32,
+    pub from: Vec3,
+    pub at: Vec3,
+    pub up: Vec3,
+    pub v: Vec3,
+    pub u: Vec3,
+    pub w: Vec3,
 }
 
 impl Camera {
-    pub fn new(width: f32, height: f32, focal_len: f32, samples: u32, fov: f32) -> Self {
-        let center = vec3(0.0, 0.0, 0.0);
+    pub fn new(
+        width: f32,
+        height: f32,
+        samples: u32,
+        fov: f32,
+        from: Vec3,
+        at: Vec3,
+        up: Vec3,
+    ) -> Self {
+        let center = from;
+        let focal_len = (from - at).length();
 
         let aspect_ratio = width / height;
 
@@ -244,15 +259,19 @@ impl Camera {
         let vph = 2.0 * h * focal_len;
         let vpw = vph * aspect_ratio;
 
+        let w = (from - at).normalize();
+        let u = up.cross(w).normalize();
+        let v = w.cross(u);
+
         // Viewport vectors
-        let vpu = vec3(vpw, 0.0, 0.0);
-        let vpv = vec3(0.0, -vph, 0.0);
+        let vpu = vpw * u;
+        let vpv = vph * -v;
 
         // Pixel delta vectors
         let pdu = vpu / width;
         let pdv = vpv / height;
 
-        let vp_start = center - vec3(0.0, 0.0, focal_len) - vpu / 2.0 - vpv / 2.0;
+        let vp_start = center - (focal_len * w) - vpu / 2.0 - vpv / 2.0;
 
         let first = vp_start + pdu / 2.0 + pdv / 2.0;
 
@@ -266,6 +285,12 @@ impl Camera {
             pdv,
             samples,
             fov,
+            from,
+            at,
+            up,
+            v,
+            u,
+            w,
         }
     }
 }
