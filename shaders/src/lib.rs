@@ -20,25 +20,35 @@ pub fn main_fs(
         vec3(0.0, 1.0, 0.0),
     );
 
-    let max_depth = 5;
+    let max_depth = 3;
+    let background = vec3(0.0, 0.0, 0.0);
 
     let mut rng = RNG::new(constants, in_coord);
 
     let redmat = Material {
         color: vec3(1.0, 0.0, 0.0),
         shininess: 0.0,
+        emission: 0.0,
     };
     let greenmat = Material {
         color: vec3(0.0, 1.0, 0.0),
         shininess: 0.0,
+        emission: 0.0,
     };
     let bluemat = Material {
         color: vec3(0.0, 0.0, 1.0),
         shininess: 0.0,
+        emission: 0.0,
     };
     let shinymat = Material {
         color: vec3(1.0, 1.0, 1.0),
         shininess: 1.0,
+        emission: 0.0,
+    };
+    let lightmat = Material {
+        color: vec3(1.0, 1.0, 1.0),
+        shininess: 0.0,
+        emission: 1.0,
     };
 
     let world = [
@@ -50,7 +60,7 @@ pub fn main_fs(
         Sphere {
             center: vec3(1.3, 0.0, -1.0),
             radius: 0.5,
-            material: greenmat,
+            material: lightmat,
         },
         Sphere {
             center: vec3(-2.0, 1.0, -2.0),
@@ -79,7 +89,7 @@ pub fn main_fs(
         let ray_direction = pixel_center - camera.center;
         let ray = Ray::new(camera.center, ray_direction);
 
-        color += ray_color(ray, world, &mut rng, max_depth);
+        color += ray_color(ray, world, &mut rng, max_depth, background);
     }
 
     color /= camera.samples as f32;

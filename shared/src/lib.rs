@@ -3,7 +3,6 @@
 use spirv_std::glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use spirv_std::num_traits::Float;
 use spirv_std::num_traits::FloatConst;
-use spirv_std::vector::Vector;
 
 pub struct ShaderConsts {
     pub resolution: [u32; 2],
@@ -100,7 +99,11 @@ impl HitData {
             normal: vec3(0.0, 0.0, 0.0),
             t: 0.0,
             front: false,
-            material: Material::new(vec3(0.0, 0.0, 0.0), 0.0),
+            material: Material {
+                color: vec3(0.0, 0.0, 0.0),
+                shininess: 0.0,
+                emission: 0.0,
+            },
         }
     }
 
@@ -120,16 +123,6 @@ pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
     pub material: Material,
-}
-
-impl Sphere {
-    pub fn new(center: Vec3, radius: f32) -> Self {
-        Self {
-            center,
-            radius,
-            material: Material::new(vec3(0.0, 0.0, 0.0), 0.0),
-        }
-    }
 }
 
 impl Hittable for Sphere {
@@ -188,29 +181,31 @@ impl<T: Copy + Hittable, const N: usize> Hittable for [T; N] {
     }
 }
 
-pub fn ray_color(mut ray: Ray, world: impl Copy + Hittable, rng: &mut RNG, max_depth: u32) -> Vec3 {
+pub fn ray_color(
+    mut ray: Ray,
+    world: impl Copy + Hittable,
+    rng: &mut RNG,
+    max_depth: u32,
+    background: Vec3,
+) -> Vec3 {
     let mut color = vec3(1.0, 1.0, 1.0);
+    let mut light = vec3(0.0, 0.0, 0.0);
 
     for _ in 0..max_depth {
         let mut hit_data = HitData::new();
-
         if world.hit(&ray, 0.0001, f32::INFINITY, &mut hit_data) {
             let (r, col) = hit_data.material.scatter(&ray, &hit_data, rng);
             ray = r;
+            let emit = hit_data.material.emit();
+            light += color * emit;
             color *= col;
         } else {
-            let res = 0.5 * (ray.direction.normalize().y + 1.0);
-            return color
-                * vec3(
-                    (1.0 - res) * 1.0 + res * 0.3,
-                    (1.0 - res) * 1.0 + res * 0.5,
-                    (1.0 - res) * 1.0 + res * 1.0,
-                );
+            light += color * background;
+            break;
         }
     }
 
-    // If max depth reached
-    vec3(0.0, 0.0, 0.0)
+    light
 }
 
 pub fn convert_color(color: f32) -> f32 {
@@ -300,12 +295,10 @@ impl Camera {
 pub struct Material {
     pub color: Vec3,
     pub shininess: f32,
+    pub emission: f32,
 }
 
 impl Material {
-    pub fn new(color: Vec3, shininess: f32) -> Self {
-        Self { color, shininess }
-    }
     pub fn scatter(&self, ray: &Ray, hit_data: &HitData, rng: &mut RNG) -> (Ray, Vec3) {
         let scatter_dir = if rng.rand_f() < self.shininess {
             ray.direction.reflect(hit_data.normal)
@@ -316,5 +309,8 @@ impl Material {
         let ray = Ray::new(hit_data.point, scatter_dir);
         let att = self.color;
         (ray, att)
+    }
+    pub fn emit(&self) -> Vec3 {
+        self.color * self.emission
     }
 }
