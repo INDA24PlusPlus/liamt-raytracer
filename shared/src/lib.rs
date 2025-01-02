@@ -7,7 +7,7 @@ use spirv_std::num_traits::FloatConst;
 #[repr(C)]
 pub struct ShaderConsts {
     pub bounce_limit: u32,
-    pub time: f32,
+    pub time: u32,
     pub width: f32,
     pub height: f32,
     pub samples: u32,
@@ -17,14 +17,14 @@ pub struct ShaderConsts {
     pub pitch: f32,
 }
 
-pub struct RNG {
+pub struct RandomSauce {
     pub state: u32,
 }
 
-impl RNG {
+impl RandomSauce {
     pub fn new(consts: &ShaderConsts, coords: Vec4) -> Self {
         let mut state = coords.x.to_bits() + coords.y.to_bits() * 10000;
-        state ^= consts.time.to_bits();
+        state ^= consts.time * 1337;
         Self { state }
     }
 
@@ -192,7 +192,7 @@ impl<T: Copy + Hittable, const N: usize> Hittable for [T; N] {
 pub fn ray_color(
     mut ray: Ray,
     world: impl Copy + Hittable,
-    rng: &mut RNG,
+    rng: &mut RandomSauce,
     max_depth: u32,
     background: Vec3,
 ) -> Vec3 {
@@ -303,7 +303,7 @@ pub struct Material {
 }
 
 impl Material {
-    pub fn scatter(&self, ray: &Ray, hit_data: &HitData, rng: &mut RNG) -> (Ray, Vec3) {
+    pub fn scatter(&self, ray: &Ray, hit_data: &HitData, rng: &mut RandomSauce) -> (Ray, Vec3) {
         let scatter_dir = if rng.rand_f() < self.shininess {
             ray.direction.reflect(hit_data.normal)
         } else {

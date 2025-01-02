@@ -23,7 +23,7 @@ pub fn main_fs(
     let max_depth = constants.bounce_limit;
     let background = vec3(0.0, 0.0, 0.0);
 
-    let mut rng = RNG::new(constants, in_coord);
+    let mut rng = RandomSauce::new(constants, in_coord);
 
     let redmat = Material {
         color: vec3(1.0, 0.0, 0.0),

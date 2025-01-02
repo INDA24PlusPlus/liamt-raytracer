@@ -17,12 +17,11 @@ fn main() {
 struct Model {
     pipeline: wgpu::RenderPipeline,
     gui: Egui,
-    window_gui: Egui,
     fps: Fps,
     hold_pos: Option<Point2>,
     camera: Camera,
     bounce_limit: u32,
-    time: f32,
+    time: u32,
     mouse_speed: f32,
     move_speed: f32,
 }
@@ -48,21 +47,9 @@ fn model(_app: &App) -> Model {
         .build()
         .unwrap();
 
-    let gui_win_id = _app
-        .new_window()
-        .title("Locked in")
-        .size(200, WIN_HEIGHT)
-        .view(gui_view)
-        .raw_event(raw_event_func_gui)
-        .build()
-        .unwrap();
-
     let window = _app.window(win_id).unwrap();
-    let window_gui = Egui::from_window(&window);
+    let gui = Egui::from_window(&window);
     let device = window.device();
-
-    let gui_window = _app.window(gui_win_id).unwrap();
-    let gui = Egui::from_window(&gui_window);
 
     let shader_module = device.create_shader_module(load_shader_desc());
 
@@ -85,11 +72,10 @@ fn model(_app: &App) -> Model {
     Model {
         pipeline,
         gui,
-        window_gui,
         fps: Fps::default(),
         hold_pos: None,
         bounce_limit: 3,
-        time: 0.0,
+        time: 0,
         mouse_speed: 0.2,
         move_speed: 0.1,
         camera: Camera::new(
@@ -111,6 +97,8 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
     let ctx = egui.begin_frame();
 
     egui::Window::new("Settings").show(&ctx, |ui| {
+        ui.label("Move with WASD, space, shift");
+        ui.add_space(10.0);
         ui.label(format!("FPS: {:.2}", model.fps.avg()));
 
         ui.label("Samples");
@@ -129,7 +117,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
         ui.add(egui::Slider::new(&mut model.mouse_speed, 0.01..=1.0));
     });
 
-    model.time += 1.0;
+    model.time += 1;
 }
 
 fn view(app: &App, model: &Model, frame: Frame) {
@@ -157,22 +145,15 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
     render_pass.draw(0..3, 0..1);
 
+    drop(render_pass);
+    drop(encoder);
+
+    model.gui.draw_to_frame(&frame);
     model.fps.tick();
 }
 
-fn gui_view(app: &App, model: &Model, frame: Frame) {
-    let draw = app.draw();
-    draw.background().color(PINK);
-    draw.to_frame(app, &frame).unwrap();
-    model.gui.draw_to_frame(&frame);
-}
-
-fn raw_event_func_gui(_app: &App, model: &mut Model, event: &WindowEvent) {
-    model.gui.handle_raw_event(event);
-}
-
 fn raw_event_func(app: &App, model: &mut Model, event: &WindowEvent) {
-    model.window_gui.handle_raw_event(event);
+    model.gui.handle_raw_event(event);
 
     if let WindowEvent::MouseInput { button, state, .. } = event {
         if *button == MouseButton::Left {
