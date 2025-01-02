@@ -10,25 +10,6 @@ pub fn main_fs(
     #[spirv(push_constant)] constants: &ShaderConsts,
     output: &mut Vec4,
 ) {
-    let camera = Camera::new(
-        constants.width,
-        constants.height,
-        constants.samples,
-        constants.fov,
-        vec3(constants.pos.0, constants.pos.1, constants.pos.2),
-        constants.yaw,
-        constants.pitch,
-    );
-
-    let max_depth = constants.bounce_limit;
-    let background = Color::new(
-        constants.background.0,
-        constants.background.1,
-        constants.background.2,
-    );
-
-    let mut rng = RandomSauce::new(constants, in_coord);
-
     let redmat = Material {
         color: Color::new(1.0, 0.0, 0.0),
         shininess: 0.0,
@@ -42,6 +23,11 @@ pub fn main_fs(
     let bluemat = Material {
         color: Color::new(0.0, 0.0, 1.0),
         shininess: 0.0,
+        emission: 0.0,
+    };
+    let yellowmat = Material {
+        color: Color::new(1.0, 1.0, 0.0),
+        shininess: 0.8,
         emission: 0.0,
     };
     let shinymat = Material {
@@ -62,18 +48,38 @@ pub fn main_fs(
             material: shinymat,
         },
         Sphere {
+            center: vec3(0.2, 0.7, -1.9),
+            radius: 0.3,
+            material: shinymat,
+        },
+        Sphere {
             center: vec3(1.3, 0.5, -1.0),
             radius: 0.5,
             material: lightmat,
         },
         Sphere {
-            center: vec3(-2.0, 1.5, -2.0),
+            center: vec3(-2.1, 2.0, -1.9),
             radius: 0.3,
-            material: greenmat,
+            material: lightmat,
         },
         Sphere {
-            center: vec3(2.5, 1.0, -3.5),
+            center: vec3(-2.0, 0.3, -0.0),
+            radius: 0.3,
+            material: redmat,
+        },
+        Sphere {
+            center: vec3(1.3, 0.2, -2.2),
             radius: 0.2,
+            material: bluemat,
+        },
+        Sphere {
+            center: vec3(-0.9, 0.3, -1.5),
+            radius: 0.3,
+            material: yellowmat,
+        },
+        Sphere {
+            center: vec3(3.5, 1.6, -0.9),
+            radius: 1.6,
             material: bluemat,
         },
     ];
@@ -82,6 +88,25 @@ pub fn main_fs(
         y: 0.0,
         material: redmat,
     }];
+
+    let camera = Camera::new(
+        constants.width,
+        constants.height,
+        constants.samples,
+        constants.fov,
+        vec3(constants.pos.0, constants.pos.1, constants.pos.2),
+        constants.yaw,
+        constants.pitch,
+    );
+
+    let max_depth = constants.bounce_limit;
+    let background = Color::new(
+        constants.background.0,
+        constants.background.1,
+        constants.background.2,
+    );
+
+    let mut rng = RandomSauce::new(constants, in_coord);
 
     let mut color = Color::new(0.0, 0.0, 0.0);
 

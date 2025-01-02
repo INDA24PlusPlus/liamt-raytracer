@@ -77,10 +77,10 @@ fn model(_app: &App) -> Model {
         gui,
         fps: Fps::default(),
         hold_pos: None,
-        bounce_limit: 3,
+        bounce_limit: 5,
         time: 0,
         mouse_speed: 20.0,
-        move_speed: 15.0,
+        move_speed: 30.0,
         background: [0.0, 0.0, 0.0],
         current_pressed_keys: HashSet::new(),
         camera: Camera::new(
@@ -103,8 +103,13 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
     egui::Window::new("Settings").show(&ctx, |ui| {
         ui.label("Move with WASD, space, shift");
-        ui.add_space(10.0);
+        ui.label("Drag mouse to look around");
+
+        ui.add_space(15.0);
         ui.label(format!("FPS: {:.2}", model.fps.avg()));
+        ui.label(format!("FPS min: {:.2}", model.fps.min()));
+        ui.label(format!("FPS max: {:.2}", model.fps.max()));
+        ui.add_space(15.0);
 
         ui.label("Samples");
         ui.add(egui::Slider::new(&mut model.camera.samples, 1..=1000));
