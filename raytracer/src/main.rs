@@ -24,6 +24,7 @@ struct Model {
     time: u32,
     mouse_speed: f32,
     move_speed: f32,
+    background: [f32; 3],
 }
 
 fn model(_app: &App) -> Model {
@@ -78,6 +79,7 @@ fn model(_app: &App) -> Model {
         time: 0,
         mouse_speed: 0.2,
         move_speed: 0.1,
+        background: [0.0, 0.0, 0.0],
         camera: Camera::new(
             WIN_WIDTH as f32,
             WIN_HEIGHT as f32,
@@ -115,6 +117,10 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
         ui.label("Mouse speed");
         ui.add(egui::Slider::new(&mut model.mouse_speed, 0.01..=1.0));
+
+        ui.label("Background color");
+        //Color picker widget
+        ui.color_edit_button_rgb(&mut model.background);
     });
 
     model.time += 1;
@@ -138,6 +144,11 @@ fn view(app: &App, model: &Model, frame: Frame) {
         pos: (model.camera.pos.x, model.camera.pos.y, model.camera.pos.z),
         yaw: model.camera.yaw,
         pitch: model.camera.pitch,
+        background: (
+            model.background[0],
+            model.background[1],
+            model.background[2],
+        ),
     };
 
     let bytes = unsafe { any_as_u8_slice(&constants) };
@@ -178,6 +189,7 @@ fn raw_event_func(app: &App, model: &mut Model, event: &WindowEvent) {
             let pitch = -dir.y * model.mouse_speed;
             model.camera.yaw += yaw;
             model.camera.pitch += pitch;
+            model.camera.pitch = model.camera.pitch.clamp(-89.0, 89.0);
 
             model.hold_pos = Some(vec2(position.x as f32, position.y as f32));
         }

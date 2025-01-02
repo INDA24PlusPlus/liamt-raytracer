@@ -3,6 +3,8 @@
 use spirv_std::glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use spirv_std::num_traits::Float;
 use spirv_std::num_traits::FloatConst;
+pub use utils::Color;
+mod utils;
 
 #[repr(C)]
 pub struct ShaderConsts {
@@ -15,6 +17,7 @@ pub struct ShaderConsts {
     pub pos: (f32, f32, f32),
     pub yaw: f32,
     pub pitch: f32,
+    pub background: (f32, f32, f32),
 }
 
 pub struct RandomSauce {
@@ -108,7 +111,7 @@ impl HitData {
             t: 0.0,
             front: false,
             material: Material {
-                color: vec3(0.0, 0.0, 0.0),
+                color: Color::new(0.0, 0.0, 0.0),
                 shininess: 0.0,
                 emission: 0.0,
             },
@@ -223,10 +226,10 @@ pub fn ray_color(
     planes: &impl Hittable,
     rng: &mut RandomSauce,
     max_depth: u32,
-    background: Vec3,
-) -> Vec3 {
-    let mut color = vec3(1.0, 1.0, 1.0);
-    let mut light = vec3(0.0, 0.0, 0.0);
+    background: Color,
+) -> Color {
+    let mut color = Color::new(1.0, 1.0, 1.0);
+    let mut light = Color::new(0.0, 0.0, 0.0);
 
     for _ in 0..max_depth {
         let mut closest = f32::INFINITY;
@@ -337,13 +340,13 @@ impl Camera {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Material {
-    pub color: Vec3,
+    pub color: Color,
     pub shininess: f32,
     pub emission: f32,
 }
 
 impl Material {
-    pub fn scatter(&self, ray: &Ray, hit_data: &HitData, rng: &mut RandomSauce) -> (Ray, Vec3) {
+    pub fn scatter(&self, ray: &Ray, hit_data: &HitData, rng: &mut RandomSauce) -> (Ray, Color) {
         let scatter_dir = if rng.rand_f() < self.shininess {
             ray.direction.reflect(hit_data.normal)
         } else {
@@ -354,7 +357,7 @@ impl Material {
         let att = self.color;
         (ray, att)
     }
-    pub fn emit(&self) -> Vec3 {
+    pub fn emit(&self) -> Color {
         self.color * self.emission
     }
 }

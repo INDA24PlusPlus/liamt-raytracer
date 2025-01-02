@@ -21,32 +21,36 @@ pub fn main_fs(
     );
 
     let max_depth = constants.bounce_limit;
-    let background = vec3(0.0, 0.0, 0.0);
+    let background = Color::new(
+        constants.background.0,
+        constants.background.1,
+        constants.background.2,
+    );
 
     let mut rng = RandomSauce::new(constants, in_coord);
 
     let redmat = Material {
-        color: vec3(1.0, 0.0, 0.0),
+        color: Color::new(1.0, 0.0, 0.0),
         shininess: 0.0,
         emission: 0.0,
     };
     let greenmat = Material {
-        color: vec3(0.0, 1.0, 0.0),
+        color: Color::new(0.0, 1.0, 0.0),
         shininess: 0.0,
         emission: 0.0,
     };
     let bluemat = Material {
-        color: vec3(0.0, 0.0, 1.0),
+        color: Color::new(0.0, 0.0, 1.0),
         shininess: 0.0,
         emission: 0.0,
     };
     let shinymat = Material {
-        color: vec3(1.0, 1.0, 1.0),
+        color: Color::new(1.0, 1.0, 1.0),
         shininess: 1.0,
         emission: 0.0,
     };
     let lightmat = Material {
-        color: vec3(1.0, 1.0, 1.0),
+        color: Color::new(1.0, 1.0, 1.0),
         shininess: 0.0,
         emission: 1.0,
     };
@@ -79,7 +83,7 @@ pub fn main_fs(
         material: redmat,
     }];
 
-    let mut color = vec3(0.0, 0.0, 0.0);
+    let mut color = Color::new(0.0, 0.0, 0.0);
 
     let pdu = camera.pdu();
     let pdv = camera.pdv();
@@ -98,6 +102,8 @@ pub fn main_fs(
     }
 
     color /= camera.samples as f32;
+
+    let color = color.to_srgb();
 
     *output = vec4(color.x, color.y, color.z, 1.0);
 }
