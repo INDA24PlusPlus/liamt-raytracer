@@ -11,16 +11,16 @@ pub fn main_fs(
     output: &mut Vec4,
 ) {
     let camera = Camera::new(
-        constants.resolution[0] as f32,
-        constants.resolution[1] as f32,
-        100,
-        90.0,
-        vec3(-2.0, 2.0, 1.0),
-        vec3(0.0, 0.0, -1.0),
-        vec3(0.0, 1.0, 0.0),
+        constants.width,
+        constants.height,
+        constants.samples,
+        constants.fov,
+        vec3(constants.pos.0, constants.pos.1, constants.pos.2),
+        constants.yaw,
+        constants.pitch,
     );
 
-    let max_depth = 3;
+    let max_depth = constants.bounce_limit;
     let background = vec3(0.0, 0.0, 0.0);
 
     let mut rng = RNG::new(constants, in_coord);
@@ -81,13 +81,18 @@ pub fn main_fs(
 
     let mut color = vec3(0.0, 0.0, 0.0);
 
+    let pdu = camera.pdu();
+    let pdv = camera.pdv();
+    let first = camera.first();
+
     for _ in 0..camera.samples {
-        let offset_square = vec3(rng.rand_f() - 0.5, rng.rand_f() - 0.5, 0.0);
-        let pixel_center = camera.first
-            + camera.pdu * (in_coord.x + offset_square.x)
-            + camera.pdv * (in_coord.y + offset_square.y);
-        let ray_direction = pixel_center - camera.center;
-        let ray = Ray::new(camera.center, ray_direction);
+        let offset_x = rng.rand_f() - 0.5;
+        let offset_y = rng.rand_f() - 0.5;
+
+        let pixel_center =
+            first + pdu * (in_coord.x + offset_x) + pdv * (camera.height - (in_coord.y + offset_y));
+        let ray_direction = pixel_center - camera.pos;
+        let ray = Ray::new(camera.pos, ray_direction);
 
         color += ray_color(ray, world, &mut rng, max_depth, background);
     }

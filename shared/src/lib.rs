@@ -4,9 +4,17 @@ use spirv_std::glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use spirv_std::num_traits::Float;
 use spirv_std::num_traits::FloatConst;
 
+#[repr(C)]
 pub struct ShaderConsts {
-    pub resolution: [u32; 2],
+    pub bounce_limit: u32,
     pub time: f32,
+    pub width: f32,
+    pub height: f32,
+    pub samples: u32,
+    pub fov: f32,
+    pub pos: (f32, f32, f32),
+    pub yaw: f32,
+    pub pitch: f32,
 }
 
 pub struct RNG {
@@ -15,7 +23,7 @@ pub struct RNG {
 
 impl RNG {
     pub fn new(consts: &ShaderConsts, coords: Vec4) -> Self {
-        let mut state = coords.x.to_bits() + coords.y.to_bits() * consts.resolution[0];
+        let mut state = coords.x.to_bits() + coords.y.to_bits() * 10000;
         state ^= consts.time.to_bits();
         Self { state }
     }
@@ -217,21 +225,13 @@ pub fn convert_color(color: f32) -> f32 {
 }
 
 pub struct Camera {
-    pub aspect_ratio: f32,
     pub width: f32,
     pub height: f32,
-    pub center: Vec3,
-    pub first: Vec3,
-    pub pdu: Vec3,
-    pub pdv: Vec3,
+    pub pos: Vec3,
     pub samples: u32,
     pub fov: f32,
-    pub from: Vec3,
-    pub at: Vec3,
-    pub up: Vec3,
-    pub v: Vec3,
-    pub u: Vec3,
-    pub w: Vec3,
+    pub yaw: f32,
+    pub pitch: f32,
 }
 
 impl Camera {
@@ -240,53 +240,57 @@ impl Camera {
         height: f32,
         samples: u32,
         fov: f32,
-        from: Vec3,
-        at: Vec3,
-        up: Vec3,
+        pos: Vec3,
+        yaw: f32,
+        pitch: f32,
     ) -> Self {
-        let center = from;
-        let focal_len = (from - at).length();
-
-        let aspect_ratio = width / height;
-
-        let t = fov * f32::PI() / 180.0;
-        let h = (t / 2.0).tan();
-        let vph = 2.0 * h * focal_len;
-        let vpw = vph * aspect_ratio;
-
-        let w = (from - at).normalize();
-        let u = up.cross(w).normalize();
-        let v = w.cross(u);
-
-        // Viewport vectors
-        let vpu = vpw * u;
-        let vpv = vph * -v;
-
-        // Pixel delta vectors
-        let pdu = vpu / width;
-        let pdv = vpv / height;
-
-        let vp_start = center - (focal_len * w) - vpu / 2.0 - vpv / 2.0;
-
-        let first = vp_start + pdu / 2.0 + pdv / 2.0;
-
         Self {
-            aspect_ratio,
             width,
             height,
-            center,
-            first,
-            pdu,
-            pdv,
             samples,
             fov,
-            from,
-            at,
-            up,
-            v,
-            u,
-            w,
+            yaw,
+            pitch,
+            pos,
         }
+    }
+
+    pub fn direction(&self) -> Vec3 {
+        let yaw = self.yaw.to_radians();
+        let pitch = self.pitch.to_radians();
+        vec3(
+            yaw.cos() * pitch.cos(),
+            pitch.sin(),
+            yaw.sin() * pitch.cos(),
+        )
+    }
+    pub fn u(&self) -> Vec3 {
+        let forward = self.direction();
+        let up = vec3(0.0, 1.0, 0.0);
+        forward.cross(up).normalize()
+    }
+    pub fn v(&self) -> Vec3 {
+        self.u().cross(self.direction()).normalize()
+    }
+    pub fn near_plane_dimensions(&self) -> (f32, f32) {
+        let plane_height = 2.0 * (self.fov.to_radians() / 2.0).tan();
+        let plane_width = plane_height * (self.width / self.height);
+        (plane_width, plane_height)
+    }
+    pub fn first(&self) -> Vec3 {
+        let (plane_width, plane_height) = self.near_plane_dimensions();
+        let center = self.pos + self.direction();
+        let right = self.u().normalize() * (plane_width * 0.5);
+        let up = self.v().normalize() * (plane_height * 0.5);
+        center - right - up
+    }
+    pub fn pdu(&self) -> Vec3 {
+        let (plane_width, _) = self.near_plane_dimensions();
+        self.u().normalize() * (plane_width / self.width)
+    }
+    pub fn pdv(&self) -> Vec3 {
+        let (_, plane_height) = self.near_plane_dimensions();
+        self.v().normalize() * (plane_height / self.height)
     }
 }
 

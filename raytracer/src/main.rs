@@ -1,4 +1,7 @@
+use fps_ticker::Fps;
 use nannou::prelude::*;
+use nannou::winit::event::{ElementState, MouseButton, VirtualKeyCode, WindowEvent};
+use nannou_egui::{self, egui, Egui};
 use shared::*;
 use spirv_builder::{Capability, MetadataPrintout, SpirvBuilder};
 use std::borrow::Cow;
@@ -13,7 +16,15 @@ fn main() {
 
 struct Model {
     pipeline: wgpu::RenderPipeline,
-    constants: ShaderConsts,
+    gui: Egui,
+    window_gui: Egui,
+    fps: Fps,
+    hold_pos: Option<Point2>,
+    camera: Camera,
+    bounce_limit: u32,
+    time: f32,
+    mouse_speed: f32,
+    move_speed: f32,
 }
 
 fn model(_app: &App) -> Model {
@@ -33,10 +44,25 @@ fn model(_app: &App) -> Model {
         .size(WIN_WIDTH, WIN_HEIGHT)
         .resizable(false)
         .view(view)
+        .raw_event(raw_event_func)
         .build()
         .unwrap();
+
+    let gui_win_id = _app
+        .new_window()
+        .title("Locked in")
+        .size(200, WIN_HEIGHT)
+        .view(gui_view)
+        .raw_event(raw_event_func_gui)
+        .build()
+        .unwrap();
+
     let window = _app.window(win_id).unwrap();
+    let window_gui = Egui::from_window(&window);
     let device = window.device();
+
+    let gui_window = _app.window(gui_win_id).unwrap();
+    let gui = Egui::from_window(&gui_window);
 
     let shader_module = device.create_shader_module(load_shader_desc());
 
@@ -56,19 +82,54 @@ fn model(_app: &App) -> Model {
         .sample_count(window.msaa_samples())
         .build(device);
 
-    let constants = ShaderConsts {
-        resolution: [WIN_WIDTH, WIN_HEIGHT],
-        time: 0.0,
-    };
-
     Model {
         pipeline,
-        constants,
+        gui,
+        window_gui,
+        fps: Fps::default(),
+        hold_pos: None,
+        bounce_limit: 3,
+        time: 0.0,
+        mouse_speed: 0.2,
+        move_speed: 0.1,
+        camera: Camera::new(
+            WIN_WIDTH as f32,
+            WIN_HEIGHT as f32,
+            50,
+            90.0,
+            glam::Vec3::new(0.0, 1.0, 2.0),
+            -90.0,
+            0.0,
+        ),
     }
 }
 
 fn update(_app: &App, model: &mut Model, _update: Update) {
-    model.constants.time += 1.0;
+    let egui = &mut model.gui;
+
+    egui.set_elapsed_time(_update.since_start);
+    let ctx = egui.begin_frame();
+
+    egui::Window::new("Settings").show(&ctx, |ui| {
+        ui.label(format!("FPS: {:.2}", model.fps.avg()));
+
+        ui.label("Samples");
+        ui.add(egui::Slider::new(&mut model.camera.samples, 1..=1000));
+
+        ui.label("Bounce limit");
+        ui.add(egui::Slider::new(&mut model.bounce_limit, 1..=20));
+
+        ui.label("FOV");
+        ui.add(egui::Slider::new(&mut model.camera.fov, 1.0..=150.0));
+
+        ui.label("Move speed");
+        ui.add(egui::Slider::new(&mut model.move_speed, 0.01..=1.0));
+
+        ui.label("Mouse speed");
+        ui.add(egui::Slider::new(&mut model.mouse_speed, 0.01..=1.0));
+    });
+
+    model.time += 1.0;
 }
 
 fn view(app: &App, model: &Model, frame: Frame) {
@@ -79,10 +140,97 @@ fn view(app: &App, model: &Model, frame: Frame) {
         .begin(&mut encoder);
     render_pass.set_pipeline(&model.pipeline);
 
-    let bytes = unsafe { any_as_u8_slice(&model.constants) };
+    let constants = ShaderConsts {
+        time: model.time,
+        bounce_limit: model.bounce_limit,
+        width: model.camera.width,
+        height: model.camera.height,
+        samples: model.camera.samples,
+        fov: model.camera.fov,
+        pos: (model.camera.pos.x, model.camera.pos.y, model.camera.pos.z),
+        yaw: model.camera.yaw,
+        pitch: model.camera.pitch,
+    };
+
+    let bytes = unsafe { any_as_u8_slice(&constants) };
     render_pass.set_push_constants(wgpu::ShaderStages::all(), 0, bytes);
 
     render_pass.draw(0..3, 0..1);
+
+    model.fps.tick();
+}
+
+fn gui_view(app: &App, model: &Model, frame: Frame) {
+    let draw = app.draw();
+    draw.background().color(PINK);
+    draw.to_frame(app, &frame).unwrap();
+    model.gui.draw_to_frame(&frame);
+}
+
+fn raw_event_func_gui(_app: &App, model: &mut Model, event: &WindowEvent) {
+    model.gui.handle_raw_event(event);
+}
+
+fn raw_event_func(app: &App, model: &mut Model, event: &WindowEvent) {
+    model.window_gui.handle_raw_event(event);
+
+    if let WindowEvent::MouseInput { button, state, .. } = event {
+        if *button == MouseButton::Left {
+            match state {
+                ElementState::Pressed => {
+                    model.hold_pos = Some(vec2(
+                        app.mouse.position().x + (WIN_WIDTH as f32 / 2.0),
+                        -app.mouse.position().y + (WIN_HEIGHT as f32 / 2.0),
+                    ));
+                }
+                ElementState::Released => {
+                    model.hold_pos = None;
+                }
+            }
+        }
+    }
+
+    if let WindowEvent::CursorMoved { position, .. } = event {
+        if let Some(pos) = model.hold_pos {
+            let dir = vec2(position.x as f32, position.y as f32) - pos;
+            let yaw = dir.x * model.mouse_speed;
+            let pitch = -dir.y * model.mouse_speed;
+            model.camera.yaw += yaw;
+            model.camera.pitch += pitch;
+
+            model.hold_pos = Some(vec2(position.x as f32, position.y as f32));
+        }
+    }
+
+    if let WindowEvent::KeyboardInput { input, .. } = event {
+        let forward_vector = model.camera.direction();
+        let right_vector = forward_vector.cross(glam::Vec3::new(0.0, 1.0, 0.0));
+        let up_vector = glam::Vec3::new(0.0, 1.0, 0.0);
+
+        if let Some(keycode) = input.virtual_keycode {
+            match keycode {
+                VirtualKeyCode::W => {
+                    model.camera.pos += forward_vector * model.move_speed;
+                }
+                VirtualKeyCode::A => {
+                    model.camera.pos -= right_vector * model.move_speed;
+                }
+                VirtualKeyCode::S => {
+                    model.camera.pos -= forward_vector * model.move_speed;
+                }
+                VirtualKeyCode::D => {
+                    model.camera.pos += right_vector * model.move_speed;
+                }
+                VirtualKeyCode::Space => {
+                    model.camera.pos += up_vector * model.move_speed;
+                }
+                VirtualKeyCode::LShift => {
+                    model.camera.pos -= up_vector * model.move_speed;
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 // From https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
