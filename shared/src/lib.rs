@@ -169,9 +169,37 @@ impl Hittable for Sphere {
     }
 }
 
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct Plane {
+    pub y: f32,
+    pub material: Material,
+}
+
+impl Hittable for Plane {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32, hit_data: &mut HitData) -> bool {
+        if ray.direction.y == 0.0 {
+            return false;
+        }
+
+        let t = (self.y - ray.origin.y) / ray.direction.y;
+        if t < t_min || t > t_max {
+            return false;
+        }
+
+        hit_data.t = t;
+        hit_data.point = ray.at(t);
+        hit_data.normal = vec3(0.0, 1.0, 0.0);
+        hit_data.set_normal(ray, hit_data.normal);
+        hit_data.material = self.material;
+
+        true
+    }
+}
+
 // Very hacky thing i found, but it like works so im happy
 // Using this because vectors not work and like i cant pass lists as arguments
-impl<T: Copy + Hittable, const N: usize> Hittable for [T; N] {
+impl<T: Hittable, const N: usize> Hittable for [T; N] {
     fn hit(&self, ray: &Ray, t_min: f32, t_max: f32, hit_data: &mut HitData) -> bool {
         let mut data = HitData::new();
         let mut has_hit = false;
@@ -191,7 +219,8 @@ impl<T: Copy + Hittable, const N: usize> Hittable for [T; N] {
 
 pub fn ray_color(
     mut ray: Ray,
-    world: impl Copy + Hittable,
+    spheres: &impl Hittable,
+    planes: &impl Hittable,
     rng: &mut RandomSauce,
     max_depth: u32,
     background: Vec3,
@@ -200,8 +229,19 @@ pub fn ray_color(
     let mut light = vec3(0.0, 0.0, 0.0);
 
     for _ in 0..max_depth {
+        let mut closest = f32::INFINITY;
+        let mut hit = false;
         let mut hit_data = HitData::new();
-        if world.hit(&ray, 0.0001, f32::INFINITY, &mut hit_data) {
+
+        if spheres.hit(&ray, 0.0001, closest, &mut hit_data) {
+            closest = hit_data.t;
+            hit = true;
+        }
+        if planes.hit(&ray, 0.0001, closest, &mut hit_data) {
+            hit = true;
+        }
+
+        if hit {
             let (r, col) = hit_data.material.scatter(&ray, &hit_data, rng);
             ray = r;
             let emit = hit_data.material.emit();

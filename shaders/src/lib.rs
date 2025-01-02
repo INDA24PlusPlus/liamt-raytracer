@@ -51,33 +51,33 @@ pub fn main_fs(
         emission: 1.0,
     };
 
-    let world = [
+    let spheres = [
         Sphere {
-            center: vec3(0.0, 0.0, -1.0),
+            center: vec3(0.0, 0.5, -1.0),
             radius: 0.5,
             material: shinymat,
         },
         Sphere {
-            center: vec3(1.3, 0.0, -1.0),
+            center: vec3(1.3, 0.5, -1.0),
             radius: 0.5,
             material: lightmat,
         },
         Sphere {
-            center: vec3(-2.0, 1.0, -2.0),
+            center: vec3(-2.0, 1.5, -2.0),
             radius: 0.3,
             material: greenmat,
         },
         Sphere {
-            center: vec3(2.5, 0.5, -3.5),
+            center: vec3(2.5, 1.0, -3.5),
             radius: 0.2,
             material: bluemat,
         },
-        Sphere {
-            center: vec3(0.0, -100.5, -1.0),
-            radius: 100.0,
-            material: redmat,
-        },
     ];
+
+    let planes = [Plane {
+        y: 0.0,
+        material: redmat,
+    }];
 
     let mut color = vec3(0.0, 0.0, 0.0);
 
@@ -94,7 +94,7 @@ pub fn main_fs(
         let ray_direction = pixel_center - camera.pos;
         let ray = Ray::new(camera.pos, ray_direction);
 
-        color += ray_color(ray, world, &mut rng, max_depth, background);
+        color += ray_color(ray, &spheres, &planes, &mut rng, max_depth, background);
     }
 
     color /= camera.samples as f32;
