@@ -5,6 +5,7 @@ use nannou_egui::{self, egui, Egui};
 use shared::*;
 use spirv_builder::{Capability, MetadataPrintout, SpirvBuilder};
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 const WIN_WIDTH: u32 = 800;
@@ -25,6 +26,7 @@ struct Model {
     mouse_speed: f32,
     move_speed: f32,
     background: [f32; 3],
+    current_pressed_keys: HashSet<VirtualKeyCode>,
 }
 
 fn model(_app: &App) -> Model {
@@ -77,9 +79,10 @@ fn model(_app: &App) -> Model {
         hold_pos: None,
         bounce_limit: 3,
         time: 0,
-        mouse_speed: 0.2,
-        move_speed: 0.1,
+        mouse_speed: 20.0,
+        move_speed: 15.0,
         background: [0.0, 0.0, 0.0],
+        current_pressed_keys: HashSet::new(),
         camera: Camera::new(
             WIN_WIDTH as f32,
             WIN_HEIGHT as f32,
@@ -113,15 +116,45 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
         ui.add(egui::Slider::new(&mut model.camera.fov, 1.0..=150.0));
 
         ui.label("Move speed");
-        ui.add(egui::Slider::new(&mut model.move_speed, 0.01..=1.0));
+        ui.add(egui::Slider::new(&mut model.move_speed, 1.0..=100.0));
 
         ui.label("Mouse speed");
-        ui.add(egui::Slider::new(&mut model.mouse_speed, 0.01..=1.0));
+        ui.add(egui::Slider::new(&mut model.mouse_speed, 1.0..=100.0));
 
         ui.label("Background color");
-        //Color picker widget
         ui.color_edit_button_rgb(&mut model.background);
     });
+
+    if !model.current_pressed_keys.is_empty() {
+        let forward_vector = model.camera.direction();
+        let right_vector = forward_vector.cross(glam::Vec3::new(0.0, 1.0, 0.0));
+        let up_vector = glam::Vec3::new(0.0, 1.0, 0.0);
+        let move_speed_offset = 0.001;
+
+        for key in model.current_pressed_keys.iter() {
+            match key {
+                VirtualKeyCode::W => {
+                    model.camera.pos += forward_vector * model.move_speed * move_speed_offset;
+                }
+                VirtualKeyCode::A => {
+                    model.camera.pos -= right_vector * model.move_speed * move_speed_offset;
+                }
+                VirtualKeyCode::S => {
+                    model.camera.pos -= forward_vector * model.move_speed * move_speed_offset;
+                }
+                VirtualKeyCode::D => {
+                    model.camera.pos += right_vector * model.move_speed * move_speed_offset;
+                }
+                VirtualKeyCode::Space => {
+                    model.camera.pos += up_vector * model.move_speed * move_speed_offset;
+                }
+                VirtualKeyCode::LShift => {
+                    model.camera.pos -= up_vector * model.move_speed * move_speed_offset;
+                }
+                _ => {}
+            }
+        }
+    }
 
     model.time += 1;
 }
@@ -185,8 +218,8 @@ fn raw_event_func(app: &App, model: &mut Model, event: &WindowEvent) {
     if let WindowEvent::CursorMoved { position, .. } = event {
         if let Some(pos) = model.hold_pos {
             let dir = vec2(position.x as f32, position.y as f32) - pos;
-            let yaw = dir.x * model.mouse_speed;
-            let pitch = -dir.y * model.mouse_speed;
+            let yaw = dir.x * model.mouse_speed * 0.01;
+            let pitch = -dir.y * model.mouse_speed * 0.01;
             model.camera.yaw += yaw;
             model.camera.pitch += pitch;
             model.camera.pitch = model.camera.pitch.clamp(-89.0, 89.0);
@@ -196,31 +229,14 @@ fn raw_event_func(app: &App, model: &mut Model, event: &WindowEvent) {
     }
 
     if let WindowEvent::KeyboardInput { input, .. } = event {
-        let forward_vector = model.camera.direction();
-        let right_vector = forward_vector.cross(glam::Vec3::new(0.0, 1.0, 0.0));
-        let up_vector = glam::Vec3::new(0.0, 1.0, 0.0);
-
         if let Some(keycode) = input.virtual_keycode {
-            match keycode {
-                VirtualKeyCode::W => {
-                    model.camera.pos += forward_vector * model.move_speed;
+            match input.state {
+                ElementState::Pressed => {
+                    model.current_pressed_keys.insert(keycode);
                 }
-                VirtualKeyCode::A => {
-                    model.camera.pos -= right_vector * model.move_speed;
+                ElementState::Released => {
+                    model.current_pressed_keys.remove(&keycode);
                 }
-                VirtualKeyCode::S => {
-                    model.camera.pos -= forward_vector * model.move_speed;
-                }
-                VirtualKeyCode::D => {
-                    model.camera.pos += right_vector * model.move_speed;
-                }
-                VirtualKeyCode::Space => {
-                    model.camera.pos += up_vector * model.move_speed;
-                }
-                VirtualKeyCode::LShift => {
-                    model.camera.pos -= up_vector * model.move_speed;
-                }
-                _ => {}
             }
         }
     }
